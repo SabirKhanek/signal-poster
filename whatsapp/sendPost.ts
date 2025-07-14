@@ -7,7 +7,9 @@ export async function sendPostToGroup(
   sock: WASocket,
   jid: string,
   post: Post
-): Promise<void> {
+): Promise<boolean> {
+  if (!sock) return false;
+
   try {
     const msgContent = formatPost(post);
     const sentMsg = await sock.sendMessage(jid, { text: msgContent });
@@ -15,56 +17,47 @@ export async function sendPostToGroup(
 
     if (post.imageTitle && post.imageFormat) {
       const imageUrl = `https://s3.us-east-2.amazonaws.com/waqarzaka.net/waqarzakaMainContent/uploadedImages/img_${post.imageTitle}.${post.imageFormat}`;
-      try {
-        await sock.sendMessage(
-          jid,
-          {
-            image: { url: imageUrl },
-            caption: "Image for this signal.",
-          },
-          { quoted: sentMsg }
-        );
-        console.log("✅ Sent image to group:", jid);
-      } catch (e) {
-        console.error("❌ Failed sending image:", e);
-      }
+      await sock.sendMessage(
+        jid,
+        {
+          image: { url: imageUrl },
+          caption: "Image for this signal.",
+        },
+        { quoted: sentMsg }
+      );
+      console.log("✅ Sent image to group:", jid);
     }
 
     if (post.video) {
-      try {
-        await sock.sendMessage(
-          jid,
-          {
-            video: { url: post.video },
-            caption: "Video for this signal.",
-          },
-          { quoted: sentMsg }
-        );
-        console.log("✅ Sent video to group:", jid);
-      } catch (e) {
-        console.error("❌ Failed sending video:", e);
-      }
+      await sock.sendMessage(
+        jid,
+        {
+          video: { url: post.video },
+          caption: "Video for this signal.",
+        },
+        { quoted: sentMsg }
+      );
+      console.log("✅ Sent video to group:", jid);
     }
 
     if (post.pdfFile) {
       const fileName = `signal-${post._id}.pdf`;
-      try {
-        await sock.sendMessage(
-          jid,
-          {
-            document: { url: post.pdfFile },
-            mimetype: "application/pdf",
-            fileName,
-          },
-          { quoted: sentMsg }
-        );
-        console.log("✅ Sent PDF to group:", jid);
-      } catch (e) {
-        console.error("❌ Failed sending PDF:", e);
-      }
+      await sock.sendMessage(
+        jid,
+        {
+          document: { url: post.pdfFile },
+          mimetype: "application/pdf",
+          fileName,
+        },
+        { quoted: sentMsg }
+      );
+      console.log("✅ Sent PDF to group:", jid);
     }
+
+    return true;
   } catch (e) {
-    console.error("❌ Failed sending main message:", e);
+    console.error("❌ Failed sending message to group:", jid, e);
+    return false;
   }
 }
 

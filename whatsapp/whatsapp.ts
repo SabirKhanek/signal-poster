@@ -12,7 +12,15 @@ import inquirer from "inquirer";
 export async function connectToWhatsApp(): Promise<WASocket> {
   const { state, saveCreds } = await useMultiFileAuthState("auth_info");
 
-  const socket = makeWASocket({
+  let resolveConnected: () => void;
+  let rejectConnected: (err: any) => void;
+
+  const connected = new Promise<void>((resolve, reject) => {
+    resolveConnected = resolve;
+    rejectConnected = reject;
+  });
+
+  let socket = makeWASocket({
     auth: state,
     syncFullHistory: false,
     logger: pino({ level: "silent" }),
@@ -20,31 +28,37 @@ export async function connectToWhatsApp(): Promise<WASocket> {
 
   socket.ev.on("creds.update", saveCreds);
 
-  const connected = new Promise<void>((resolve, reject) => {
-    socket.ev.on("connection.update", (update) => {
-      const { connection, lastDisconnect, qr } = update;
+  socket.ev.on("connection.update", (update) => {
+    const { connection, lastDisconnect, qr } = update;
 
-      if (qr) {
-        console.log("⚠️ Scan this QR code to connect:\n");
-        qrcode.generate(qr, { small: true });
-      }
+    if (qr) {
+      console.log("⚠️ Scan this QR code to connect:\n");
+      qrcode.generate(qr, { small: true });
+    }
 
-      if (connection === "close") {
-        const shouldReconnect =
-          lastDisconnect?.error instanceof Boom &&
-          lastDisconnect?.error?.output?.statusCode !==
-            DisconnectReason.loggedOut;
-        console.log("Connection closed. Reconnect:", shouldReconnect);
-        if (shouldReconnect) {
-          connectToWhatsApp().then(() => resolve());
-        } else {
-          reject(new Error("WhatsApp logged out or connection closed."));
-        }
-      } else if (connection === "open") {
-        console.log("✅ WhatsApp connection established!");
-        resolve();
+    if (connection === "open") {
+      console.log("✅ WhatsApp connection established!");
+      resolveConnected();
+    }
+
+    if (connection === "close") {
+      const shouldReconnect =
+        lastDisconnect?.error instanceof Boom &&
+        lastDisconnect?.error?.output?.statusCode !==
+          DisconnectReason.loggedOut;
+
+      console.log("Connection closed. Reconnect:", shouldReconnect);
+
+      if (shouldReconnect) {
+        connectToWhatsApp().then((newSock) => {
+          socket = newSock;
+          console.log("✅ Reconnected to WhatsApp.");
+        });
+      } else {
+        console.error("❌ WhatsApp logged out. Restart your bot manually.");
+        rejectConnected(new Error("WhatsApp logged out or connection closed."));
       }
-    });
+    }
   });
 
   await connected;
