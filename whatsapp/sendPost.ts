@@ -14,7 +14,7 @@ export async function sendPostToGroup(
     console.log(`✅ Sent text to group ${jid}`);
 
     if (post.imageTitle && post.imageFormat) {
-      const imageUrl = `https://s3.us-east-2.amazonaws.com/waqarzaka.net/waqarzakaMainContent/uploadedImages/${post.imageTitle}.${post.imageFormat}`;
+      const imageUrl = `https://s3.us-east-2.amazonaws.com/waqarzaka.net/waqarzakaMainContent/uploadedImages/img_${post.imageTitle}.${post.imageFormat}`;
       try {
         await sock.sendMessage(
           jid,
