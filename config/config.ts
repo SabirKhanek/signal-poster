@@ -34,6 +34,8 @@ const CONFIG_FILE = "./config.js";
 export async function loadOrCreateConfig(sock: WASocket): Promise<Config> {
   let existingConfig: Partial<Config> = {};
 
+  const useDefaults = process.argv.includes("-y");
+
   if (fs.existsSync(CONFIG_FILE)) {
     const fullPath = path.resolve(CONFIG_FILE);
     const configModule = await import(url.pathToFileURL(fullPath).href);
@@ -41,76 +43,102 @@ export async function loadOrCreateConfig(sock: WASocket): Promise<Config> {
     console.log("✅ Loaded existing config.");
   }
 
-  const apiTokenAnswer = await inquirer.prompt<{ apiToken: string }>({
-    type: "input",
-    name: "apiToken",
-    message: "Enter API Token:",
-    default: existingConfig.apiToken || "",
-  });
+  let apiTokenAnswer: { apiToken: string };
+  if (useDefaults) {
+    apiTokenAnswer = { apiToken: existingConfig.apiToken || "" };
+  } else {
+    apiTokenAnswer = await inquirer.prompt<{ apiToken: string }>({
+      type: "input",
+      name: "apiToken",
+      message: "Enter API Token:",
+      default: existingConfig.apiToken || "",
+    });
+  }
 
-  const userIdAnswer = await inquirer.prompt<{ userId: string }>({
-    type: "input",
-    name: "userId",
-    message: "Enter User ID:",
-    default: existingConfig.userId || "",
-  });
+  let userIdAnswer: { userId: string };
+  if (useDefaults) {
+    userIdAnswer = { userId: existingConfig.userId || "" };
+  } else {
+    userIdAnswer = await inquirer.prompt<{ userId: string }>({
+      type: "input",
+      name: "userId",
+      message: "Enter User ID:",
+      default: existingConfig.userId || "",
+    });
+  }
 
   let whatsappGroupJids = existingConfig.whatsappGroupJids || [];
-  if (whatsappGroupJids.length === 0) {
-    whatsappGroupJids = await chooseWhatsAppGroups(sock);
+  if (useDefaults && whatsappGroupJids.length > 0) {
+    console.log("✅ Using existing WhatsApp groups.");
   } else {
-    const confirm = await inquirer.prompt<{ keep: boolean }>({
-      type: "confirm",
-      name: "keep",
-      message: `Keep existing groups?\n${whatsappGroupJids.join("\n")}`,
-      default: true,
-    });
-
-    if (!confirm.keep) {
+    if (whatsappGroupJids.length === 0 || !useDefaults) {
       whatsappGroupJids = await chooseWhatsAppGroups(sock);
     }
   }
 
-  const pollIntervalAnswer = await inquirer.prompt<{ pollInterval: string }>({
-    type: "input",
-    name: "pollInterval",
-    message: "Polling interval in seconds:",
-    default: existingConfig.pollInterval?.toString() || "60",
-  });
+  let pollIntervalAnswer: { pollInterval: string };
+  if (useDefaults) {
+    pollIntervalAnswer = {
+      pollInterval: existingConfig.pollInterval?.toString() || "60",
+    };
+  } else {
+    pollIntervalAnswer = await inquirer.prompt<{ pollInterval: string }>({
+      type: "input",
+      name: "pollInterval",
+      message: "Polling interval in seconds:",
+      default: existingConfig.pollInterval?.toString() || "60",
+    });
+  }
 
   let telegramConfig: TelegramConfig | undefined = existingConfig.telegram;
 
-  const telegramConfirm = await inquirer.prompt<{ enableTelegram: boolean }>({
-    type: "confirm",
-    name: "enableTelegram",
-    message: "Do you want to configure Telegram monitoring?",
-    default: telegramConfig != null,
-  });
-
-  if (telegramConfirm.enableTelegram) {
-    const apiIdAns = await inquirer.prompt<{ apiId: string }>({
-      type: "input",
-      name: "apiId",
-      message: "Telegram API ID:",
-      default: telegramConfig?.apiId?.toString() || "",
+  let enableTelegram = telegramConfig != null;
+  if (!useDefaults) {
+    const telegramConfirm = await inquirer.prompt<{
+      enableTelegram: boolean;
+    }>({
+      type: "confirm",
+      name: "enableTelegram",
+      message: "Do you want to configure Telegram monitoring?",
+      default: enableTelegram,
     });
+    enableTelegram = telegramConfirm.enableTelegram;
+  }
 
-    const apiHashAns = await inquirer.prompt<{ apiHash: string }>({
-      type: "input",
-      name: "apiHash",
-      message: "Telegram API Hash:",
-      default: telegramConfig?.apiHash || "",
-    });
+  if (enableTelegram) {
+    let apiIdAns: { apiId: string };
+    let apiHashAns: { apiHash: string };
+    let channelAns: { channelUsername: string };
 
-    const channelAns = await inquirer.prompt<{ channelUsername: string }>({
-      type: "input",
-      name: "channelUsername",
-      message: "Telegram channel username (without @):",
-      default: telegramConfig?.channelUsername || "",
-    });
+    if (useDefaults) {
+      apiIdAns = { apiId: telegramConfig?.apiId?.toString() || "" };
+      apiHashAns = { apiHash: telegramConfig?.apiHash || "" };
+      channelAns = { channelUsername: telegramConfig?.channelUsername || "" };
+    } else {
+      apiIdAns = await inquirer.prompt<{ apiId: string }>({
+        type: "input",
+        name: "apiId",
+        message: "Telegram API ID:",
+        default: telegramConfig?.apiId?.toString() || "",
+      });
+
+      apiHashAns = await inquirer.prompt<{ apiHash: string }>({
+        type: "input",
+        name: "apiHash",
+        message: "Telegram API Hash:",
+        default: telegramConfig?.apiHash || "",
+      });
+
+      channelAns = await inquirer.prompt<{ channelUsername: string }>({
+        type: "input",
+        name: "channelUsername",
+        message: "Telegram channel username (without @):",
+        default: telegramConfig?.channelUsername || "",
+      });
+    }
 
     telegramConfig = {
-      apiId: parseInt(apiIdAns.apiId, 10),
+      apiId: parseInt(apiIdAns.apiId, 10) || 0,
       apiHash: apiHashAns.apiHash,
       channelUsername: channelAns.channelUsername,
     };

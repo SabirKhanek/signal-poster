@@ -47,17 +47,22 @@ export async function connectToWhatsApp(): Promise<WASocket> {
         lastDisconnect?.error?.output?.statusCode !==
           DisconnectReason.loggedOut;
 
-      console.log("Connection closed. Reconnect:", shouldReconnect);
+      console.log(
+        "Connection closed. Restarting... (it'll only restart if restart mechanism is configured)",
+        shouldReconnect
+      );
 
-      if (shouldReconnect) {
-        connectToWhatsApp().then((newSock) => {
-          socket = newSock;
-          console.log("✅ Reconnected to WhatsApp.");
-        });
-      } else {
-        console.error("❌ WhatsApp logged out. Restart your bot manually.");
-        rejectConnected(new Error("WhatsApp logged out or connection closed."));
-      }
+      process.exit(1);
+
+      // if (shouldReconnect) {
+      //   connectToWhatsApp().then((newSock) => {
+      //     socket = newSock;
+      //     console.log("✅ Reconnected to WhatsApp.");
+      //   });
+      // } else {
+      //   console.error("❌ WhatsApp logged out. Restart your bot manually.");
+      //   rejectConnected(new Error("WhatsApp logged out or connection closed."));
+      // }
     }
   });
 

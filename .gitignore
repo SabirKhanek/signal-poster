@@ -3,3 +3,4 @@ node_modules
 config.js
 known_posts.json
 sent_posts.json
+run-bot.sh
